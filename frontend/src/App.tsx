@@ -21,11 +21,14 @@ function ProtectedDashboard({ user, onLogout }: { user: any, onLogout: () => voi
   return (
     <div className="container">
       <div className="app-header">
-        <div className="app-header-title">
-          <h1>ViajesQ</h1>
-          <p>
-            {user.role === 'driver' ? `Bienvenido, ${user.name} 👋` : `Panel de Control — ${user.name} (${user.role})`}
-          </p>
+        <div className="app-header-title" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <img src="/logo.jpg" alt="ViajesQ Logo" style={{ width: '45px', height: '45px', borderRadius: '8px', objectFit: 'cover' }} />
+          <div>
+            <h1 style={{ margin: 0, lineHeight: '1.2' }}>ViajesQ</h1>
+            <p style={{ margin: 0, marginTop: '4px' }}>
+              {user.role === 'driver' ? `Bienvenido, ${user.name} 👋` : `Panel de Control — ${user.name} (${user.role})`}
+            </p>
+          </div>
         </div>
         <button onClick={handleLogout} className="btn btn-secondary logout-btn">
           Cerrar Sesión

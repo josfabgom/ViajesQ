@@ -93,16 +93,36 @@ export const updateTrip = async (req: Request, res: Response) => {
   const { id } = req.params;
   const { driver_id, vehicle_id, passenger_id, origin_place_id, destination_place_id, scheduled_time, distance_km, price_rate_id, total_price, status } = req.body;
   try {
-    if (scheduled_time) {
+    if (scheduled_time && status !== 'completed') {
       const errorMsg = await checkOverlap(driver_id, passenger_id, scheduled_time, id);
       if (errorMsg) {
         return res.status(400).json({ error: errorMsg });
       }
     }
 
+    let finalPrice = total_price;
+    let finalRate = price_rate_id;
+
+    if (status === 'completed' && (!finalPrice || parseFloat(finalPrice) === 0)) {
+       let pricePerKm = 0;
+       if (finalRate) {
+          const r = await pool.query(`SELECT price_per_km FROM price_rates WHERE id = $1`, [finalRate]);
+          if (r.rows.length > 0) pricePerKm = r.rows[0].price_per_km;
+       } else {
+          const r = await pool.query(`SELECT id, price_per_km FROM price_rates LIMIT 1`);
+          if (r.rows.length > 0) {
+            finalRate = r.rows[0].id;
+            pricePerKm = r.rows[0].price_per_km;
+          }
+       }
+       if (distance_km) {
+          finalPrice = (parseFloat(distance_km) * pricePerKm).toFixed(2);
+       }
+    }
+
     const result = await pool.query(
       `UPDATE trips SET driver_id=$1, vehicle_id=$2, passenger_id=$3, origin_place_id=$4, destination_place_id=$5, scheduled_time=$6, distance_km=$7, price_rate_id=$8, total_price=$9, status=$10 WHERE id=$11 RETURNING *`,
-      [driver_id || null, vehicle_id || null, passenger_id || null, origin_place_id || null, destination_place_id || null, scheduled_time || null, distance_km || null, price_rate_id || null, total_price || null, status, id]
+      [driver_id || null, vehicle_id || null, passenger_id || null, origin_place_id || null, destination_place_id || null, scheduled_time || null, distance_km || null, finalRate || null, finalPrice || null, status, id]
     );
     res.json(result.rows[0]);
   } catch (error) {
@@ -126,11 +146,34 @@ export const finishTrip = async (req: Request, res: Response) => {
   const { id } = req.params;
   const { distance_km } = req.body;
   try {
+    const tripRes = await pool.query(`SELECT distance_km, total_price, price_rate_id FROM trips WHERE id = $1`, [id]);
+    if (tripRes.rows.length === 0) return res.status(404).json({ error: 'Trip not found' });
+    const trip = tripRes.rows[0];
+    
+    let finalDist = distance_km !== undefined ? distance_km : trip.distance_km || 0;
+    let finalPrice = trip.total_price;
+    let rateId = trip.price_rate_id;
+    
+    if (!finalPrice || parseFloat(finalPrice) === 0) {
+       let pricePerKm = 0;
+       if (rateId) {
+          const r = await pool.query(`SELECT price_per_km FROM price_rates WHERE id = $1`, [rateId]);
+          if (r.rows.length > 0) pricePerKm = r.rows[0].price_per_km;
+       } else {
+          const r = await pool.query(`SELECT id, price_per_km FROM price_rates LIMIT 1`);
+          if (r.rows.length > 0) {
+            rateId = r.rows[0].id;
+            pricePerKm = r.rows[0].price_per_km;
+          }
+       }
+       finalPrice = (finalDist * pricePerKm).toFixed(2);
+    }
+
     const result = await pool.query(
       `UPDATE trips 
-       SET status = 'completed', distance_km = COALESCE($1, distance_km), ended_at = CURRENT_TIMESTAMP 
-       WHERE id = $2 RETURNING *`,
-      [distance_km || null, id]
+       SET status = 'completed', distance_km = $1, total_price = $2, price_rate_id = $3, ended_at = CURRENT_TIMESTAMP 
+       WHERE id = $4 RETURNING *`,
+      [finalDist, finalPrice, rateId, id]
     );
     res.json(result.rows[0]);
   } catch (error) {

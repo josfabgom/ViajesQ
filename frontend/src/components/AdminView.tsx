@@ -1,4 +1,5 @@
 import { CalendarioView } from './CalendarioView';
+import { CuentaCorrienteView } from './CuentaCorrienteView';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
@@ -132,6 +133,9 @@ export function AdminView() {
         ]);
         setUsersData(usersRes.data);
         setRoles(rolesRes.data);
+      } else if (activeTab === 'cuenta_corriente') {
+        const res = await axios.get(`${API_URL}/admin/drivers`);
+        setDrivers(res.data);
       }
       
       // Always fetch settings for default map center
@@ -225,7 +229,7 @@ export function AdminView() {
       showToast('Configuración guardada exitosamente.', 'success');
       fetchData();
     } catch (error) {
-      showToast('Error guardando configuración', 'success');
+      showToast('Error guardando configuración', 'error');
     }
   };
 
@@ -254,6 +258,7 @@ export function AdminView() {
           <option value="tarifas">💰 Tarifas</option>
           <option value="lugares">📍 Lugares</option>
           <option value="choferes">👨‍✈️ Choferes</option>
+          <option value="cuenta_corriente">💳 Cuentas Choferes</option>
           <option value="pasajeros">👥 Pasajeros</option>
           <option value="vehiculos">🚗 Vehículos</option>
           <option value="configuracion">⚙️ Configuración</option>
@@ -267,6 +272,7 @@ export function AdminView() {
         <button className={`admin-tab-btn ${activeTab === 'tarifas' ? 'active' : ''}`} onClick={() => setActiveTab('tarifas')}>💰 Tarifas</button>
         <button className={`admin-tab-btn ${activeTab === 'lugares' ? 'active' : ''}`} onClick={() => setActiveTab('lugares')}>📍 Lugares</button>
         <button className={`admin-tab-btn ${activeTab === 'choferes' ? 'active' : ''}`} onClick={() => setActiveTab('choferes')}>👨‍✈️ Choferes</button>
+        <button className={`admin-tab-btn ${activeTab === 'cuenta_corriente' ? 'active' : ''}`} onClick={() => setActiveTab('cuenta_corriente')}>💳 Cuentas</button>
         <button className={`admin-tab-btn ${activeTab === 'pasajeros' ? 'active' : ''}`} onClick={() => setActiveTab('pasajeros')}>👥 Pasajeros</button>
         <button className={`admin-tab-btn ${activeTab === 'vehiculos' ? 'active' : ''}`} onClick={() => setActiveTab('vehiculos')}>🚗 Vehículos</button>
         <button className={`admin-tab-btn ${activeTab === 'configuracion' ? 'active' : ''}`} onClick={() => setActiveTab('configuracion')}>⚙️ Configuración</button>
@@ -282,12 +288,57 @@ export function AdminView() {
           priceRates={priceRates} 
           openModal={openModal} 
           handleDelete={handleDelete}
+          settings={settings}
         />
+      )}
+
+      {activeTab === 'cuenta_corriente' && (
+        <CuentaCorrienteView drivers={drivers} />
       )}
 
       {activeTab === 'configuracion' && (
         <div>
           <h3>⚙️ Configuración del Sistema</h3>
+          <div style={{ backgroundColor: '#f9fafb', padding: '20px', borderRadius: '8px', border: '1px solid #e5e7eb', marginBottom: '20px' }}>
+            <h4>Configuración del Calendario</h4>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '15px' }}>
+              Define el rango horario y la vista por defecto (mes, semana, día) del calendario.
+            </p>
+            <div style={{ display: 'flex', gap: '15px', marginBottom: '15px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '150px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Hora de Inicio</label>
+                <input 
+                  type="time" 
+                  className="form-control" 
+                  value={settingsForm.calendar_start_time || '00:00'} 
+                  onChange={(e) => setSettingsForm({...settingsForm, calendar_start_time: e.target.value})}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: '150px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Hora de Fin</label>
+                <input 
+                  type="time" 
+                  className="form-control" 
+                  value={settingsForm.calendar_end_time || '23:59'} 
+                  onChange={(e) => setSettingsForm({...settingsForm, calendar_end_time: e.target.value})}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: '150px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Vista por Defecto</label>
+                <select 
+                  className="form-control" 
+                  value={settingsForm.calendar_default_view || 'month'} 
+                  onChange={(e) => setSettingsForm({...settingsForm, calendar_default_view: e.target.value})}
+                >
+                  <option value="month">Mes</option>
+                  <option value="week">Semana</option>
+                  <option value="day">Día</option>
+                  <option value="agenda">Agenda</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          
           <div style={{ backgroundColor: '#f9fafb', padding: '20px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
             <h4>Ciudad por defecto (Centro del Mapa)</h4>
             <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '15px' }}>

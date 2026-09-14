@@ -49,6 +49,13 @@ CREATE TABLE IF NOT EXISTS places (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS price_rates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    price_per_km DECIMAL(10, 2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS trips (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     driver_id UUID REFERENCES users(id),
@@ -61,24 +68,34 @@ CREATE TABLE IF NOT EXISTS trips (
     total_price DECIMAL(10, 2),
     scheduled_time TIMESTAMP,
     status VARCHAR(50) DEFAULT 'pending',
+    payment_status VARCHAR(50) DEFAULT 'pending',
+    payment_id UUID,
+    paid_amount DECIMAL(10, 2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ended_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS driver_payments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    driver_id UUID REFERENCES users(id),
+    amount DECIMAL(10, 2) NOT NULL,
+    payment_method VARCHAR(100),
+    period_start DATE,
+    period_end DATE,
+    observations TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS settings (
     id INT PRIMARY KEY DEFAULT 1,
     default_lat DECIMAL(10, 8),
-    default_lng DECIMAL(11, 8)
+    default_lng DECIMAL(11, 8),
+    calendar_start_time VARCHAR(5) DEFAULT '00:00',
+    calendar_end_time VARCHAR(5) DEFAULT '23:59',
+    calendar_default_view VARCHAR(20) DEFAULT 'month'
 );
 
-INSERT INTO settings (id, default_lat, default_lng) VALUES (1, -34.6037, -58.3816) ON CONFLICT (id) DO NOTHING;
-
-CREATE TABLE IF NOT EXISTS price_rates (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(100) NOT NULL,
-    price_per_km DECIMAL(10, 2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+INSERT INTO settings (id, default_lat, default_lng, calendar_start_time, calendar_end_time, calendar_default_view) VALUES (1, -34.6037, -58.3816, '00:00', '23:59', 'month') ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS routes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

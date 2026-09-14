@@ -27,6 +27,7 @@ interface CalendarioViewProps {
   priceRates: any[];
   openModal: (type: string, item?: any) => void;
   handleDelete: (type: string, id: string) => void;
+  settings?: any;
 }
 
 const CustomToolbar = (toolbar: any) => {
@@ -92,8 +93,16 @@ const stringToColor = (str: string) => {
   return colors[Math.abs(hash) % colors.length];
 };
 
-export function CalendarioView({ trips, openModal }: CalendarioViewProps) {
+export function CalendarioView({ trips, openModal, settings }: CalendarioViewProps) {
   const [view, setView] = useState<any>('month');
+  
+  // Set default view once settings are loaded
+  React.useEffect(() => {
+    if (settings?.calendar_default_view) {
+      setView(settings.calendar_default_view);
+    }
+  }, [settings?.calendar_default_view]);
+
   const [date, setDate] = useState(new Date());
 
   // Map trips to calendar events
@@ -123,6 +132,23 @@ export function CalendarioView({ trips, openModal }: CalendarioViewProps) {
     openModal('trip', event.resource);
   };
 
+  // Determine min and max time for calendar day/week view
+  const getMinTime = () => {
+    const timeString = settings?.calendar_start_time || '00:00';
+    const [hours, minutes] = timeString.split(':');
+    const d = new Date();
+    d.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+    return d;
+  };
+
+  const getMaxTime = () => {
+    const timeString = settings?.calendar_end_time || '23:59';
+    const [hours, minutes] = timeString.split(':');
+    const d = new Date();
+    d.setHours(parseInt(hours, 10), parseInt(minutes, 10), 59, 999);
+    return d;
+  };
+
   return (
     <div className="card calendar-card" style={{ height: '80vh', padding: '15px' }}>
       <div className="calendar-header">
@@ -140,6 +166,8 @@ export function CalendarioView({ trips, openModal }: CalendarioViewProps) {
           onNavigate={setDate}
           startAccessor="start"
           endAccessor="end"
+          min={getMinTime()}
+          max={getMaxTime()}
           style={{ height: '100%', fontFamily: 'Inter, sans-serif' }}
           culture="es"
           components={{

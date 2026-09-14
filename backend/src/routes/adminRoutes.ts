@@ -7,6 +7,7 @@ import { getSettings, updateSettings } from '../controllers/settingsController';
 import { getRoutes, createRoute, updateRoute, deleteRoute } from '../controllers/routeController';
 import { getUsers, createUser, updateUser, deleteUser, getRoles } from '../controllers/userController';
 import { getPriceRates, createPriceRate, updatePriceRate, deletePriceRate } from '../controllers/priceRatesController';
+import { getDriverBalances, getPendingTrips, createPayment, getPaymentHistory } from '../controllers/paymentController';
 import { authMiddleware, requireAdmin } from '../middleware/auth';
 
 const router = Router();
@@ -52,5 +53,10 @@ router.post('/users', requireAdmin, createUser);
 router.put('/users/:id', requireAdmin, updateUser);
 router.delete('/users/:id', requireAdmin, deleteUser);
 router.get('/roles', requireAdmin, getRoles);
+
+router.get('/payments/balances', requireAdmin, getDriverBalances);
+router.get('/payments/pending/:driver_id', requireAdmin, getPendingTrips);
+router.post('/payments', requireAdmin, createPayment);
+router.get('/payments/history/:driver_id', requireAdmin, getPaymentHistory);
 
 export default router;

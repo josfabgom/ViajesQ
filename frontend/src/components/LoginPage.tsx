@@ -48,15 +48,19 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       }}>
         {/* Logo / Title */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{
-            width: '64px', height: '64px',
-            background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-            borderRadius: '16px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '32px',
-            margin: '0 auto 16px',
-            boxShadow: '0 8px 16px rgba(79,70,229,0.3)'
-          }}>🚗</div>
+          <img 
+            src="/logo.jpg" 
+            alt="ViajesQ Logo" 
+            style={{ 
+              width: '80px', 
+              height: '80px', 
+              borderRadius: '20px', 
+              objectFit: 'cover',
+              margin: '0 auto 16px',
+              boxShadow: '0 8px 16px rgba(79,70,229,0.3)',
+              display: 'block'
+            }} 
+          />
           <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: '#1e1b4b' }}>ViajesQ</h1>
           <p style={{ margin: '8px 0 0', color: '#6b7280', fontSize: '14px' }}>Sistema de Gestión de Viajes</p>
         </div>

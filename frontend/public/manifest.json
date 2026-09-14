@@ -1,0 +1,17 @@
+{
+  "name": "ViajesQ",
+  "short_name": "ViajesQ",
+  "description": "Sistema de gestión de viajes, choferes y pasajeros.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "/logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}

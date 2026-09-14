@@ -11,11 +11,11 @@ export const getSettings = async (req: Request, res: Response) => {
 };
 
 export const updateSettings = async (req: Request, res: Response) => {
-  const { default_lat, default_lng } = req.body;
+  const { default_lat, default_lng, calendar_start_time, calendar_end_time, calendar_default_view } = req.body;
   try {
     const result = await pool.query(
-      'UPDATE settings SET default_lat = $1, default_lng = $2 WHERE id = 1 RETURNING *',
-      [default_lat, default_lng]
+      'UPDATE settings SET default_lat = $1, default_lng = $2, calendar_start_time = $3, calendar_end_time = $4, calendar_default_view = $5 WHERE id = 1 RETURNING *',
+      [default_lat, default_lng, calendar_start_time || '00:00', calendar_end_time || '23:59', calendar_default_view || 'month']
     );
     res.json(result.rows[0]);
   } catch (error) {
