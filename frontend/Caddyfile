@@ -1,0 +1,11 @@
+soporteq.tech, www.soporteq.tech {
+    root * /usr/share/caddy
+    file_server
+
+    # Fallback for React Router
+    try_files {path} /index.html
+
+    # Proxy API and WebSockets to backend
+    reverse_proxy /api/* backend:3001
+    reverse_proxy /socket.io/* backend:3001
+}
