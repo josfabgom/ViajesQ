@@ -34,6 +34,7 @@ export function DriverView({ currentDriverId }: { currentDriverId?: string }) {
   const [currentTripId, setCurrentTripId] = useState<string | null>(null);
   
   const [calendarDate, setCalendarDate] = useState(new Date());
+  const [calendarView, setCalendarView] = useState<any>('week');
   const [showMap, setShowMap] = useState(false);
 
   // Tab 2: Cuenta Corriente
@@ -76,8 +77,8 @@ export function DriverView({ currentDriverId }: { currentDriverId?: string }) {
       setBalanceData(resBalance.data);
       setPendingTrips(resPending.data);
       setPaymentHistory(resHistory.data);
-      if (resSettings.data && resSettings.data.length > 0) {
-        setSettings(resSettings.data[0]);
+      if (resSettings.data) {
+        setSettings(resSettings.data);
       }
       
     } catch (error) {
@@ -123,6 +124,22 @@ export function DriverView({ currentDriverId }: { currentDriverId?: string }) {
 
   const getTripDate = (t: any) => t.ended_at ? parseISO(t.ended_at) : parseISO(t.scheduled_time || t.created_at);
   const pendingTripsToStart = trips.filter(t => t.status !== 'completed' && t.status !== 'in_progress');
+
+  const getMinTime = () => {
+    const timeString = settings?.calendar_start_time || '00:00';
+    const [hours, minutes] = timeString.split(':');
+    const d = new Date();
+    d.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+    return d;
+  };
+
+  const getMaxTime = () => {
+    const timeString = settings?.calendar_end_time || '23:59';
+    const [hours, minutes] = timeString.split(':');
+    const d = new Date();
+    d.setHours(parseInt(hours, 10), parseInt(minutes, 10), 59, 999);
+    return d;
+  };
 
   return (
     <div>
@@ -183,8 +200,12 @@ export function DriverView({ currentDriverId }: { currentDriverId?: string }) {
                 events={events}
                 date={calendarDate}
                 onNavigate={setCalendarDate}
+                view={calendarView}
+                onView={setCalendarView}
                 startAccessor="start"
                 endAccessor="end"
+                min={getMinTime()}
+                max={getMaxTime()}
                 culture="es"
                 messages={{ next: "Sig", previous: "Ant", today: "Hoy", month: "Mes", week: "Semana", day: "Día", noEventsInRange: "No hay viajes programados." }}
                 eventPropGetter={(event) => {
