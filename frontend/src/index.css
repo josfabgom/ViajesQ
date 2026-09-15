@@ -210,17 +210,7 @@ select.form-control {
   display: flex;
   gap: 8px;
   margin-bottom: 24px;
-  overflow-x: auto;
-  padding-bottom: 8px; /* Room for scrollbar */
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none;  /* Internet Explorer 10+ */
-  max-width: 100%;
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-}
-
-.admin-tabs::-webkit-scrollbar {
-  display: none; /* WebKit */
+  flex-wrap: wrap;
 }
 
 .admin-tab-btn {

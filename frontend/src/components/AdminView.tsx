@@ -1,5 +1,6 @@
 import { CalendarioView } from './CalendarioView';
 import { CuentaCorrienteView } from './CuentaCorrienteView';
+import { ReportesView } from './ReportesView';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
@@ -107,18 +108,20 @@ export function AdminView() {
         setPriceRates(ratesRes.data);
       
       } else if (activeTab === 'calendario') {
-        const [tripsRes, driversRes, passRes, placesRes, ratesRes] = await Promise.all([
+        const [tripsRes, driversRes, passRes, placesRes, ratesRes, routesRes] = await Promise.all([
           axios.get(`${API_URL}/trips`),
           axios.get(`${API_URL}/admin/drivers`),
           axios.get(`${API_URL}/admin/passengers`),
           axios.get(`${API_URL}/admin/places`),
-          axios.get(`${API_URL}/admin/price-rates`)
+          axios.get(`${API_URL}/admin/price-rates`),
+          axios.get(`${API_URL}/admin/routes`)
         ]);
         setTrips(tripsRes.data);
         setDrivers(driversRes.data);
         setPassengers(passRes.data);
         setPlaces(placesRes.data);
         setPriceRates(ratesRes.data);
+        setRoutesData(routesRes.data);
 } else if (activeTab === 'tarifas') {
         const res = await axios.get(`${API_URL}/admin/price-rates`);
         setPriceRates(res.data);
@@ -136,6 +139,13 @@ export function AdminView() {
       } else if (activeTab === 'cuenta_corriente') {
         const res = await axios.get(`${API_URL}/admin/drivers`);
         setDrivers(res.data);
+      } else if (activeTab === 'reportes') {
+        const [tripsRes, driversRes] = await Promise.all([
+          axios.get(`${API_URL}/admin/trips`),
+          axios.get(`${API_URL}/admin/drivers`)
+        ]);
+        setTrips(tripsRes.data);
+        setDrivers(driversRes.data);
       }
       
       // Always fetch settings for default map center
@@ -148,8 +158,16 @@ export function AdminView() {
 
   const openModal = (type: string, item: any = null) => {
     setModalType(type);
-    setEditingItem(item);
-    setFormData(item || {});
+    setEditingItem(item && item.id ? item : null); // Only set as editing if it has an ID
+    if (item) {
+      setFormData(item);
+    } else {
+      if (type === 'trip') {
+        setFormData({ scheduled_time: new Date().toISOString(), status: 'scheduled' });
+      } else {
+        setFormData({});
+      }
+    }
   };
 
   const closeModal = () => {
@@ -194,7 +212,11 @@ export function AdminView() {
   };
 
   const handleDelete = async (type: string, id: string) => {
-    if (!window.confirm('¿Estás seguro de eliminar este registro?')) return;
+    let msg = '¿Estás seguro de eliminar este registro?';
+    if (type === 'trip') {
+      msg = '⚠️ ATENCIÓN ⚠️\n¿Estás completamente seguro de ELIMINAR este viaje?\nEsta acción es definitiva y los reportes/pagos de este chofer se verán afectados. No se puede deshacer.';
+    }
+    if (!window.confirm(msg)) return;
     try {
       if (type === 'driver') await axios.delete(`${API_URL}/admin/drivers/${id}`);
       else if (type === 'passenger') await axios.delete(`${API_URL}/admin/passengers/${id}`);
@@ -258,7 +280,8 @@ export function AdminView() {
           <option value="tarifas">💰 Tarifas</option>
           <option value="lugares">📍 Lugares</option>
           <option value="choferes">👨‍✈️ Choferes</option>
-          <option value="cuenta_corriente">💳 Cuentas Choferes</option>
+          <option value="cuenta_corriente">💳 Cuentas</option>
+          <option value="reportes">📊 Reportes</option>
           <option value="pasajeros">👥 Pasajeros</option>
           <option value="vehiculos">🚗 Vehículos</option>
           <option value="configuracion">⚙️ Configuración</option>
@@ -273,6 +296,7 @@ export function AdminView() {
         <button className={`admin-tab-btn ${activeTab === 'lugares' ? 'active' : ''}`} onClick={() => setActiveTab('lugares')}>📍 Lugares</button>
         <button className={`admin-tab-btn ${activeTab === 'choferes' ? 'active' : ''}`} onClick={() => setActiveTab('choferes')}>👨‍✈️ Choferes</button>
         <button className={`admin-tab-btn ${activeTab === 'cuenta_corriente' ? 'active' : ''}`} onClick={() => setActiveTab('cuenta_corriente')}>💳 Cuentas</button>
+        <button className={`admin-tab-btn ${activeTab === 'reportes' ? 'active' : ''}`} onClick={() => setActiveTab('reportes')}>📊 Reportes</button>
         <button className={`admin-tab-btn ${activeTab === 'pasajeros' ? 'active' : ''}`} onClick={() => setActiveTab('pasajeros')}>👥 Pasajeros</button>
         <button className={`admin-tab-btn ${activeTab === 'vehiculos' ? 'active' : ''}`} onClick={() => setActiveTab('vehiculos')}>🚗 Vehículos</button>
         <button className={`admin-tab-btn ${activeTab === 'configuracion' ? 'active' : ''}`} onClick={() => setActiveTab('configuracion')}>⚙️ Configuración</button>
@@ -293,7 +317,11 @@ export function AdminView() {
       )}
 
       {activeTab === 'cuenta_corriente' && (
-        <CuentaCorrienteView drivers={drivers} />
+        <CuentaCorrienteView />
+      )}
+
+      {activeTab === 'reportes' && (
+        <ReportesView trips={trips} drivers={drivers} />
       )}
 
       {activeTab === 'configuracion' && (
@@ -397,25 +425,51 @@ export function AdminView() {
             <table>
               <thead>
                 <tr>
-                  <th>Fecha</th><th>Chofer/Vehículo</th><th>Pasajero</th><th>Origen ➔ Destino (Lugares)</th><th>Km</th><th>Estado</th>
+                  <th>Fecha</th><th>Chofer/Vehículo</th><th>Pasajero</th><th>Origen ➔ Destino (Lugares)</th><th>Km</th><th>Estado</th><th>Duración</th><th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {trips.length === 0 && <tr><td colSpan={6} style={{textAlign:'center', padding:'20px'}}>No hay viajes registrados.</td></tr>}
-                {trips.map(trip => (
-                  <tr key={trip.id}>
-                    <td data-label="Fecha">{new Date(trip.created_at).toLocaleDateString()}</td>
-                    <td data-label="Chofer/Vehículo"><strong>{trip.driver_name}</strong><br/><small style={{color: 'var(--text-muted)'}}>{trip.vehicle_plate}</small></td>
-                    <td data-label="Pasajero">{trip.passenger_name}</td>
-                    <td data-label="Origen ➔ Destino">{trip.origin_address} <br/><small style={{color: 'var(--text-muted)'}}>➔ {trip.destination_address}</small></td>
-                    <td data-label="Km">{trip.distance_km || '-'}</td>
-                    <td data-label="Estado">
-                      <span className={`status-badge status-${trip.status}`}>
-                        {trip.status === 'in_progress' ? 'En Curso' : 'Completado'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {trips.length === 0 && <tr><td colSpan={7} style={{textAlign:'center', padding:'20px'}}>No hay viajes registrados.</td></tr>}
+                {trips.map(trip => {
+                  let duration = '-';
+                  const startDate = new Date(trip.scheduled_time || trip.created_at);
+                  const startStr = startDate.toLocaleDateString() + ' ' + startDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                  let endStr = '-';
+
+                  if (trip.status === 'completed' && trip.ended_at) {
+                    const end = new Date(trip.ended_at);
+                    endStr = end.toLocaleDateString() + ' ' + end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    
+                    const startMs = startDate.getTime();
+                    const endMs = end.getTime();
+                    const diffMins = Math.floor((endMs - startMs) / 60000);
+                    if (diffMins > 0) {
+                      duration = diffMins < 60 ? `${diffMins} min` : `${Math.floor(diffMins/60)}h ${diffMins%60}m`;
+                    }
+                  }
+                  return (
+                    <tr key={trip.id}>
+                      <td data-label="Fecha">
+                        <div style={{ whiteSpace: 'nowrap', fontSize: '0.9em' }}><strong>Inicio:</strong> {startStr}</div>
+                        {trip.status === 'completed' && trip.ended_at && <div style={{ whiteSpace: 'nowrap', fontSize: '0.9em' }}><strong>Fin:</strong> {endStr}</div>}
+                      </td>
+                      <td data-label="Chofer/Vehículo"><strong>{trip.driver_name}</strong><br/><small style={{color: 'var(--text-muted)'}}>{trip.vehicle_plate}</small></td>
+                      <td data-label="Pasajero">{trip.passenger_name}</td>
+                      <td data-label="Origen ➔ Destino">{trip.origin_address} <br/><small style={{color: 'var(--text-muted)'}}>➔ {trip.destination_address}</small></td>
+                      <td data-label="Km">{trip.distance_km || '-'}</td>
+                      <td data-label="Estado">
+                        <span className={`status-badge status-${trip.status}`}>
+                          {trip.status === 'in_progress' ? 'En Curso' : trip.status === 'scheduled' ? 'Programado' : 'Completado'}
+                        </span>
+                      </td>
+                      <td data-label="Duración">{duration}</td>
+                      <td data-label="Acciones">
+                        <button className="action-btn" onClick={() => openModal('trip', trip)}>✏️</button>
+                        <button className="action-btn" onClick={() => handleDelete('trip', trip.id)}>🗑️</button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -603,6 +657,31 @@ export function AdminView() {
             
             {modalType === 'trip' && (
               <>
+                {!editingItem && (
+                  <div className="form-group">
+                    <label>Ruta Predefinida (Opcional)</label>
+                    <select className="form-control" onChange={e => {
+                      const routeId = e.target.value;
+                      if (!routeId) return;
+                      const route = routesData.find(r => r.id === routeId);
+                      if (route) {
+                        setFormData({
+                          ...formData,
+                          driver_id: route.driver_id,
+                          passenger_id: route.passenger_id,
+                          origin_place_id: route.origin_place_id,
+                          destination_place_id: route.destination_place_id,
+                          distance_km: route.distance_km,
+                          price_rate_id: route.price_rate_id
+                        });
+                      }
+                    }}>
+                      <option value="">Selecciona una ruta para autocompletar...</option>
+                      {routesData.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </select>
+                    <small style={{color: 'var(--text-muted)'}}>Al seleccionar una ruta se completarán automáticamente los campos de abajo.</small>
+                  </div>
+                )}
                 <div className="form-group" style={{ display: 'flex', gap: '10px' }}>
                   <div style={{ flex: 1 }}>
                     <label>Fecha y Hora</label>
@@ -782,12 +861,10 @@ export function AdminView() {
                   <label>Teléfono</label>
                   <input type="text" className="form-control" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
                 </div>
-                {!editingItem && (
-                  <div className="form-group">
-                    <label>Contraseña</label>
-                    <input type="password" className="form-control" value={formData.password || ''} onChange={e => setFormData({...formData, password: e.target.value})} />
-                  </div>
-                )}
+                <div className="form-group">
+                  <label>{editingItem ? 'Cambiar Contraseña (dejar en blanco para mantener)' : 'Contraseña'}</label>
+                  <input type="password" className="form-control" value={formData.password || ''} onChange={e => setFormData({...formData, password: e.target.value})} />
+                </div>
               </>
             )}
 
@@ -829,9 +906,19 @@ export function AdminView() {
               </>
             )}
 
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={closeModal}>Cancelar</button>
-              <button className="btn" onClick={handleSave}>Guardar</button>
+            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+              <div>
+                {editingItem && modalType === 'trip' && (
+                  <button className="btn" style={{ backgroundColor: '#dc2626', borderColor: '#dc2626' }} onClick={() => {
+                    handleDelete('trip', editingItem.id);
+                    closeModal();
+                  }}>🗑️ Eliminar Viaje</button>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button className="btn btn-secondary" onClick={closeModal}>Cancelar</button>
+                <button className="btn" onClick={handleSave}>Guardar</button>
+              </div>
             </div>
           </div>
         </div>

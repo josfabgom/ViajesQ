@@ -1,7 +1,12 @@
-import { Pool } from 'pg';
+import { Pool, types } from 'pg';
 import dotenv from 'dotenv';
 
 dotenv.config();
+
+// Fix parsing of TIMESTAMP without time zone (OID 1114) to be treated as UTC
+types.setTypeParser(1114, function(stringValue) {
+  return new Date(stringValue + 'Z');
+});
 
 export const pool = new Pool({
   user: process.env.DB_USER,

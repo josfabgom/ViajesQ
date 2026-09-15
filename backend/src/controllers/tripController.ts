@@ -3,7 +3,9 @@ import { pool } from '../config/database';
 
 export const getTrips = async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(`
+    await pool.query(`UPDATE trips SET status = 'in_progress' WHERE status = 'scheduled' AND scheduled_time <= NOW()`);
+
+    let query = `
       SELECT t.*, 
              d.name as driver_name, 
              p.name as passenger_name, 
@@ -23,8 +25,26 @@ export const getTrips = async (req: Request, res: Response) => {
       LEFT JOIN places po ON t.origin_place_id = po.id
       LEFT JOIN places pd ON t.destination_place_id = pd.id
       LEFT JOIN price_rates pr ON t.price_rate_id = pr.id
-      ORDER BY COALESCE(t.scheduled_time, t.created_at) DESC
-    `);
+    `;
+    const params: any[] = [];
+    let whereClauses: string[] = [];
+
+    if (req.query.driver_id) {
+      params.push(req.query.driver_id);
+      whereClauses.push(`t.driver_id = $${params.length}`);
+    }
+    if (req.query.status) {
+      params.push(req.query.status);
+      whereClauses.push(`t.status = $${params.length}`);
+    }
+
+    if (whereClauses.length > 0) {
+      query += ` WHERE ${whereClauses.join(' AND ')}`;
+    }
+
+    query += ` ORDER BY COALESCE(t.scheduled_time, t.created_at) DESC`;
+
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching trips', error);

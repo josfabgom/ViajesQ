@@ -1,11 +1,20 @@
 import React, { useState } from 'react';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
-import format from 'date-fns/format';
-import parse from 'date-fns/parse';
-import startOfWeek from 'date-fns/startOfWeek';
-import getDay from 'date-fns/getDay';
-import es from 'date-fns/locale/es';
+import { format, parse, startOfWeek, getDay, isSameDay } from 'date-fns';
+import { es } from 'date-fns/locale/es';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+import { MapContainer, TileLayer, Marker, Popup, Tooltip } from 'react-leaflet';
+import L from 'leaflet';
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+});
 
 const locales = {
   'es': es,
@@ -104,6 +113,7 @@ export function CalendarioView({ trips, openModal, settings }: CalendarioViewPro
   }, [settings?.calendar_default_view]);
 
   const [date, setDate] = useState(new Date());
+  const [showMap, setShowMap] = useState(false);
 
   // Map trips to calendar events
   const events = trips.map(trip => {
@@ -153,7 +163,10 @@ export function CalendarioView({ trips, openModal, settings }: CalendarioViewPro
     <div className="card calendar-card" style={{ height: '80vh', padding: '15px' }}>
       <div className="calendar-header">
         <h3 style={{ margin: 0 }}>📅 Calendario de Viajes</h3>
-        <button className="btn" style={{ width: 'auto', padding: '8px 16px' }} onClick={() => openModal('trip')}>+ Programar Viaje</button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button className="btn" style={{ width: 'auto', padding: '8px 16px', backgroundColor: '#10b981' }} onClick={() => setShowMap(true)}>🗺️ Ver Mapa del Día</button>
+          <button className="btn" style={{ width: 'auto', padding: '8px 16px' }} onClick={() => openModal('trip')}>+ Programar Viaje</button>
+        </div>
       </div>
       
       <div style={{ height: 'calc(100% - 60px)' }}>
@@ -196,6 +209,47 @@ export function CalendarioView({ trips, openModal, settings }: CalendarioViewPro
         <strong style={{ marginLeft: '10px' }}>Color:</strong>
         <span>Cada chofer tiene un color de fondo único.</span>
       </div>
+
+      {/* Map Modal */}
+      {showMap && (
+        <div className="modal-overlay" onClick={() => setShowMap(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%', zIndex: 1000 }}>
+            <div className="modal-header">
+              <h2>📍 Mapa del {date.toLocaleDateString()}</h2>
+              <button className="close-btn" onClick={() => setShowMap(false)}>×</button>
+            </div>
+            <div className="modal-content" style={{ height: '400px' }}>
+              <MapContainer 
+                center={[parseFloat(settings?.default_lat) || -34.6037, parseFloat(settings?.default_lng) || -58.3816]} 
+                zoom={11} 
+                style={{ height: '100%', width: '100%', borderRadius: '4px' }}
+              >
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                {events.filter(e => isSameDay(e.start, date)).map(e => (
+                  <div key={e.resource.id}>
+                    {e.resource.origin_lat && e.resource.origin_lng && (
+                      <Marker position={[parseFloat(e.resource.origin_lat), parseFloat(e.resource.origin_lng)]}>
+                        <Tooltip permanent direction="top" offset={[0, -20]} opacity={0.9} className="map-tooltip">
+                          <strong style={{fontSize:'12px'}}>{e.resource.origin_address}</strong><br/>{format(e.start, 'HH:mm')}
+                        </Tooltip>
+                        <Popup><strong>Origen:</strong> {e.resource.origin_address}<br/>({format(e.start, 'HH:mm')})</Popup>
+                      </Marker>
+                    )}
+                    {e.resource.destination_lat && e.resource.destination_lng && (
+                      <Marker position={[parseFloat(e.resource.destination_lat), parseFloat(e.resource.destination_lng)]}>
+                        <Tooltip permanent direction="top" offset={[0, -20]} opacity={0.9} className="map-tooltip">
+                          <strong style={{fontSize:'12px'}}>{e.resource.destination_address}</strong><br/>{format(e.start, 'HH:mm')}
+                        </Tooltip>
+                        <Popup><strong>Destino:</strong> {e.resource.destination_address}<br/>({format(e.start, 'HH:mm')})</Popup>
+                      </Marker>
+                    )}
+                  </div>
+                ))}
+              </MapContainer>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
