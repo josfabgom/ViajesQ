@@ -119,8 +119,8 @@ export function CalendarioView({ trips, openModal, settings }: CalendarioViewPro
   const events = trips.map(trip => {
     // If it doesn't have a scheduled_time, fall back to created_at
     const start = new Date(trip.scheduled_time || trip.created_at);
-    // Assume trips take 1 hour for display purposes if ended_at is null
-    const end = trip.ended_at ? new Date(trip.ended_at) : new Date(start.getTime() + 60 * 60 * 1000);
+    // Siempre respetar el horario programado usando la configuración de finalización automática
+    const end = new Date(start.getTime() + (settings?.trip_auto_finish_minutes || 20) * 60 * 1000);
     
     const statusIcon = trip.status === 'in_progress' ? '🚕 ' : trip.status === 'completed' ? '✅ ' : '🗓️ ';
 
@@ -196,7 +196,8 @@ export function CalendarioView({ trips, openModal, settings }: CalendarioViewPro
             const backgroundColor = stringToColor(event.resource.driver_name || event.resource.id);
             const opacity = event.resource.status === 'completed' ? 0.5 : 1;
             const border = event.resource.status === 'in_progress' ? '2px dashed #fff' : 'none';
-            return { style: { backgroundColor, opacity, border, borderRadius: '6px', padding: '2px 5px', fontSize: '0.85em', color: '#fff' } };
+            const className = event.resource.status === 'in_progress' ? 'event-corriendo' : '';
+            return { className, style: { backgroundColor, opacity, border, borderRadius: '6px', padding: '2px 5px', fontSize: '0.85em', color: '#fff' } };
           }}
         />
       </div>

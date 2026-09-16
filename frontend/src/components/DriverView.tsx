@@ -4,7 +4,7 @@ import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay, isToday, parseISO, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale/es';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -42,11 +42,44 @@ export function DriverView({ currentDriverId }: { currentDriverId?: string }) {
   const [pendingTrips, setPendingTrips] = useState<any[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>({});
+  
+  const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({message, type});
+    setTimeout(() => setToast(null), 5000);
+  };
 
   useEffect(() => {
     fetchDriverData();
     const interval = setInterval(fetchDriverData, 30000);
     return () => clearInterval(interval);
+  }, [currentDriverId]);
+
+  useEffect(() => {
+    if (!currentDriverId) return;
+
+    if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
+
+    let socket: any;
+    import('socket.io-client').then(({ io }) => {
+      socket = io(API_URL.replace('/api', ''));
+      socket.on('connect', () => {
+        socket.emit('join', { role: 'driver', driverId: currentDriverId });
+      });
+
+      socket.on('trip_reminder', (data) => {
+        showToast(data.message, 'success');
+        if (Notification.permission === 'granted') {
+          new Notification('Recordatorio de Viaje', { body: data.message });
+        }
+      });
+    });
+
+    return () => {
+      if (socket) socket.disconnect();
+    };
   }, [currentDriverId]);
 
   const fetchDriverData = async () => {
@@ -118,7 +151,7 @@ export function DriverView({ currentDriverId }: { currentDriverId?: string }) {
   const events = trips.map(t => ({
     title: `${t.origin_address} ➔ ${t.destination_address} (${t.passenger_name})`,
     start: new Date(t.scheduled_time || t.created_at),
-    end: t.ended_at ? new Date(t.ended_at) : new Date(new Date(t.scheduled_time || t.created_at).getTime() + 60 * 60 * 1000), // 1 hour approx
+    end: new Date(new Date(t.scheduled_time || t.created_at).getTime() + (settings?.trip_auto_finish_minutes || 20) * 60 * 1000), // Auto finish block
     resource: t,
   }));
 
@@ -143,6 +176,13 @@ export function DriverView({ currentDriverId }: { currentDriverId?: string }) {
 
   return (
     <div>
+      {toast && (
+        <div className="toast-container">
+          <div className={`toast ${toast.type}`}>
+            {toast.type === 'success' ? '⏱️' : '❌'} {toast.message}
+          </div>
+        </div>
+      )}
       <div className="admin-tabs desktop-tabs" style={{ marginBottom: '20px' }}>
         <button className={`admin-tab-btn ${activeTab === 'viajes' ? 'active' : ''}`} onClick={() => setActiveTab('viajes')}>📅 Mis Viajes</button>
         <button className={`admin-tab-btn ${activeTab === 'cuenta' ? 'active' : ''}`} onClick={() => setActiveTab('cuenta')}>💳 Mi Cuenta</button>
@@ -155,19 +195,7 @@ export function DriverView({ currentDriverId }: { currentDriverId?: string }) {
           {status === 'in_progress' && currentTripId ? (
             <div className="card" style={{ border: '2px solid #10b981', backgroundColor: '#ecfdf5' }}>
               <h3 style={{ color: '#047857', marginTop: 0 }}>🚕 Viaje en Curso</h3>
-              <p>Tienes un viaje actualmente en proceso. Por favor verifica los kilómetros al finalizar.</p>
-              <div className="form-group">
-                <label>Kilómetros recorridos</label>
-                <input 
-                  type="number" 
-                  className="form-control" 
-                  value={calculatedKm}
-                  onChange={(e) => setCalculatedKm(e.target.value)}
-                />
-              </div>
-              <button className="btn" style={{ backgroundColor: '#dc2626' }} onClick={handleFinishTrip}>
-                ⏹️ Finalizar Viaje
-              </button>
+              <p>Tienes un viaje actualmente en proceso. Este viaje se finalizará automáticamente según el tiempo configurado por el administrador en el sistema. ¡Buen viaje!</p>
             </div>
           ) : (
             pendingTripsToStart.length > 0 && (
@@ -210,9 +238,13 @@ export function DriverView({ currentDriverId }: { currentDriverId?: string }) {
                 messages={{ next: "Sig", previous: "Ant", today: "Hoy", month: "Mes", week: "Semana", day: "Día", noEventsInRange: "No hay viajes programados." }}
                 eventPropGetter={(event) => {
                   let backgroundColor = '#3b82f6'; // Programado
-                  if (event.resource.status === 'in_progress') backgroundColor = '#10b981';
+                  let className = '';
+                  if (event.resource.status === 'in_progress') {
+                    backgroundColor = '#10b981';
+                    className = 'event-corriendo';
+                  }
                   if (event.resource.status === 'completed') backgroundColor = '#9ca3af';
-                  return { style: { backgroundColor, borderRadius: '6px', color: '#fff', fontSize: '13px' } };
+                  return { className, style: { backgroundColor, borderRadius: '6px', color: '#fff', fontSize: '13px' } };
                 }}
               />
             </div>

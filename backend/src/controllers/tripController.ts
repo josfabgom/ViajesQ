@@ -3,7 +3,19 @@ import { pool } from '../config/database';
 
 export const getTrips = async (req: Request, res: Response) => {
   try {
-    await pool.query(`UPDATE trips SET status = 'in_progress' WHERE status = 'scheduled' AND scheduled_time <= NOW()`);
+    const updatedTrips = await pool.query(`UPDATE trips SET status = 'in_progress', started_at = CURRENT_TIMESTAMP WHERE status = 'scheduled' AND scheduled_time <= NOW() RETURNING id, passenger_id`);
+    
+    const io = req.app.get('io');
+    if (io && updatedTrips.rows.length > 0) {
+       for (const trip of updatedTrips.rows) {
+          const passRes = await pool.query(`SELECT name FROM passengers WHERE id=$1`, [trip.passenger_id]);
+          const passName = passRes.rows.length > 0 ? passRes.rows[0].name : 'Desconocido';
+          io.to('room_admin').emit('trip_reminder', {
+             tripId: trip.id,
+             message: `El viaje de ${passName} acaba de INICIAR.`
+          });
+       }
+    }
 
     let query = `
       SELECT t.*, 
@@ -97,11 +109,25 @@ export const createTrip = async (req: Request, res: Response) => {
     }
 
     const finalStatus = status || (scheduled_time ? 'scheduled' : 'in_progress');
+    const startedAt = finalStatus === 'in_progress' ? new Date().toISOString() : null;
     const result = await pool.query(
-      `INSERT INTO trips (driver_id, vehicle_id, passenger_id, origin_place_id, destination_place_id, scheduled_time, distance_km, price_rate_id, total_price, status) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-      [driver_id || null, vehicle_id || null, passenger_id || null, origin_place_id || null, destination_place_id || null, scheduled_time || null, distance_km || null, price_rate_id || null, total_price || null, finalStatus]
+      `INSERT INTO trips (driver_id, vehicle_id, passenger_id, origin_place_id, destination_place_id, scheduled_time, distance_km, price_rate_id, total_price, status, started_at) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      [driver_id || null, vehicle_id || null, passenger_id || null, origin_place_id || null, destination_place_id || null, scheduled_time || null, distance_km || null, price_rate_id || null, total_price || null, finalStatus, startedAt]
     );
+
+    if (finalStatus === 'in_progress') {
+       const io = req.app.get('io');
+       if (io) {
+          const passRes = await pool.query(`SELECT name FROM passengers WHERE id=$1`, [passenger_id]);
+          const passName = passRes.rows.length > 0 ? passRes.rows[0].name : 'Desconocido';
+          io.to('room_admin').emit('trip_reminder', {
+             tripId: result.rows[0].id,
+             message: `El viaje de ${passName} acaba de INICIAR.`
+          });
+       }
+    }
+
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating trip', error);
@@ -140,10 +166,26 @@ export const updateTrip = async (req: Request, res: Response) => {
        }
     }
 
+    const oldTripRes = await pool.query(`SELECT status FROM trips WHERE id=$1`, [id]);
+    const oldStatus = oldTripRes.rows.length > 0 ? oldTripRes.rows[0].status : null;
+
     const result = await pool.query(
-      `UPDATE trips SET driver_id=$1, vehicle_id=$2, passenger_id=$3, origin_place_id=$4, destination_place_id=$5, scheduled_time=$6, distance_km=$7, price_rate_id=$8, total_price=$9, status=$10 WHERE id=$11 RETURNING *`,
+      `UPDATE trips SET driver_id=$1, vehicle_id=$2, passenger_id=$3, origin_place_id=$4, destination_place_id=$5, scheduled_time=$6, distance_km=$7, price_rate_id=$8, total_price=$9, status=$10, started_at=CASE WHEN $10 = 'in_progress' THEN COALESCE(started_at, CURRENT_TIMESTAMP) ELSE started_at END WHERE id=$11 RETURNING *`,
       [driver_id || null, vehicle_id || null, passenger_id || null, origin_place_id || null, destination_place_id || null, scheduled_time || null, distance_km || null, finalRate || null, finalPrice || null, status, id]
     );
+
+    if (oldStatus !== 'in_progress' && status === 'in_progress') {
+       const io = req.app.get('io');
+       if (io) {
+          const passRes = await pool.query(`SELECT name FROM passengers WHERE id=$1`, [passenger_id]);
+          const passName = passRes.rows.length > 0 ? passRes.rows[0].name : 'Desconocido';
+          io.to('room_admin').emit('trip_reminder', {
+             tripId: id,
+             message: `El viaje de ${passName} acaba de INICIAR.`
+          });
+       }
+    }
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating trip', error);
@@ -154,6 +196,20 @@ export const updateTrip = async (req: Request, res: Response) => {
 export const deleteTrip = async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
+    const checkRes = await pool.query('SELECT paid_amount, started_at FROM trips WHERE id = $1', [id]);
+    if (checkRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Viaje no encontrado' });
+    }
+    
+    const trip = checkRes.rows[0];
+    if (trip.paid_amount && parseFloat(trip.paid_amount) > 0) {
+      return res.status(400).json({ error: 'No se puede eliminar un viaje que tiene pagos asociados. Anule el pago primero si es necesario.' });
+    }
+    
+    if (trip.started_at) {
+      return res.status(400).json({ error: 'No se puede eliminar un viaje que realmente se realizó (iniciado por el chofer). Si fue un error, considere ponerle costo $0.' });
+    }
+
     await pool.query('DELETE FROM trips WHERE id = $1', [id]);
     res.json({ message: 'Deleted successfully' });
   } catch (error) {

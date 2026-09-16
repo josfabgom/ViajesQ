@@ -3,7 +3,7 @@ import { CuentaCorrienteView } from './CuentaCorrienteView';
 import { ReportesView } from './ReportesView';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents, Popup, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -68,13 +68,38 @@ export function AdminView() {
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({message, type});
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 5000);
   };
 
 
   useEffect(() => {
     fetchData();
   }, [activeTab]);
+
+  useEffect(() => {
+    // Request notification permissions
+    if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
+
+    import('socket.io-client').then(({ io }) => {
+      const socket = io(API_URL.replace('/api', ''));
+      socket.on('connect', () => {
+        socket.emit('join', { role: 'admin' });
+      });
+
+      socket.on('trip_reminder', (data) => {
+        showToast(data.message, 'success');
+        if (Notification.permission === 'granted') {
+          new Notification('Recordatorio de Viaje (Admin)', { body: data.message });
+        }
+      });
+
+      return () => {
+        socket.disconnect();
+      };
+    });
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -364,6 +389,25 @@ export function AdminView() {
                   <option value="agenda">Agenda</option>
                 </select>
               </div>
+              <div style={{ flex: 1, minWidth: '150px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Alerta Previa (minutos)</label>
+                <input 
+                  type="number" 
+                  className="form-control" 
+                  value={settingsForm.reminder_minutes_before || 15} 
+                  onChange={(e) => setSettingsForm({...settingsForm, reminder_minutes_before: parseInt(e.target.value)})}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: '150px' }}>
+                <label style={{ display: 'block', marginBottom: '5px' }}>Finalización Auto (min)</label>
+                <input 
+                  type="number" 
+                  className="form-control" 
+                  value={settingsForm.trip_auto_finish_minutes || 20} 
+                  onChange={(e) => setSettingsForm({...settingsForm, trip_auto_finish_minutes: parseInt(e.target.value)})}
+                  title="Minutos después de iniciar el viaje para que se finalice automáticamente"
+                />
+              </div>
             </div>
           </div>
           
@@ -522,6 +566,30 @@ export function AdminView() {
             <h3>Gestión de Lugares (Puntos de Mapa)</h3>
             <button className="btn" style={{ width: 'auto', padding: '8px 16px' }} onClick={() => openModal('place')}>+ Nuevo Lugar</button>
           </div>
+          {places.length > 0 && (
+            <div style={{ marginBottom: '20px', height: '400px', width: '100%', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+              <MapContainer 
+                center={[parseFloat(settings?.default_lat) || -34.6037, parseFloat(settings?.default_lng) || -58.3816]} 
+                zoom={12} 
+                style={{ height: '100%', width: '100%' }}
+              >
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                {places.map(p => (
+                  p.lat && p.lng && (
+                    <Marker key={p.id} position={[parseFloat(p.lat), parseFloat(p.lng)]}>
+                      <Tooltip permanent direction="top" offset={[0, -20]} opacity={0.9} className="map-tooltip">
+                        <strong style={{fontSize:'12px'}}>{p.name}</strong>
+                      </Tooltip>
+                      <Popup>
+                        <strong>{p.name}</strong><br/>
+                        {p.address}
+                      </Popup>
+                    </Marker>
+                  )
+                ))}
+              </MapContainer>
+            </div>
+          )}
           <div className="table-container">
             <table>
               <thead>

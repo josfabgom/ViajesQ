@@ -72,7 +72,9 @@ CREATE TABLE IF NOT EXISTS trips (
     payment_id UUID,
     paid_amount DECIMAL(10, 2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    ended_at TIMESTAMP
+    started_at TIMESTAMP,
+    ended_at TIMESTAMP,
+    reminder_sent BOOLEAN DEFAULT FALSE
 );
 
 CREATE TABLE IF NOT EXISTS driver_payments (
@@ -83,6 +85,27 @@ CREATE TABLE IF NOT EXISTS driver_payments (
     period_start DATE,
     period_end DATE,
     observations TEXT,
+    status VARCHAR(20) DEFAULT 'active',
+    annulled_at TIMESTAMP,
+    annulled_by UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    action VARCHAR(50) NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id UUID,
+    user_id UUID REFERENCES users(id),
+    details JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS payment_trips (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    payment_id UUID REFERENCES driver_payments(id) ON DELETE CASCADE,
+    trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
+    amount_allocated DECIMAL(10, 2) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -92,7 +115,9 @@ CREATE TABLE IF NOT EXISTS settings (
     default_lng DECIMAL(11, 8),
     calendar_start_time VARCHAR(5) DEFAULT '00:00',
     calendar_end_time VARCHAR(5) DEFAULT '23:59',
-    calendar_default_view VARCHAR(20) DEFAULT 'month'
+    calendar_default_view VARCHAR(20) DEFAULT 'month',
+    reminder_minutes_before INTEGER DEFAULT 15,
+    trip_auto_finish_minutes INTEGER DEFAULT 20
 );
 
 INSERT INTO settings (id, default_lat, default_lng, calendar_start_time, calendar_end_time, calendar_default_view) VALUES (1, -34.6037, -58.3816, '00:00', '23:59', 'month') ON CONFLICT (id) DO NOTHING;
