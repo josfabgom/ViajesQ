@@ -110,7 +110,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         </form>
 
         <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: '12px', marginTop: '24px', marginBottom: 0 }}>
-          ViajesQ © 2024 — Gestión de transporte empresarial
+          ViajesQ © 2026 - Gestión de Transporte Profesional
         </p>
       </div>
     </div>
