@@ -183,6 +183,17 @@ export function DriverView({ currentDriverId }: { currentDriverId?: string }) {
           </div>
         </div>
       )}
+      <div className="mobile-tabs-dropdown">
+        <label className="mobile-tabs-label">Sección Actual:</label>
+        <select 
+          className="form-control" 
+          value={activeTab} 
+          onChange={(e) => setActiveTab(e.target.value)}
+        >
+          <option value="viajes">📅 Mis Viajes</option>
+          <option value="cuenta">💳 Mi Cuenta</option>
+        </select>
+      </div>
       <div className="admin-tabs desktop-tabs" style={{ marginBottom: '20px' }}>
         <button className={`admin-tab-btn ${activeTab === 'viajes' ? 'active' : ''}`} onClick={() => setActiveTab('viajes')}>📅 Mis Viajes</button>
         <button className={`admin-tab-btn ${activeTab === 'cuenta' ? 'active' : ''}`} onClick={() => setActiveTab('cuenta')}>💳 Mi Cuenta</button>
