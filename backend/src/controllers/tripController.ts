@@ -68,14 +68,17 @@ const checkOverlap = async (driver_id: string | null, passenger_id: string | nul
   if (!scheduled_time) return null;
   if (!driver_id && !passenger_id) return null;
   
-  // We assume a trip takes 1 hour. Overlap means there is a trip whose scheduled_time is within 59 minutes.
+  // Obtenemos la duración del viaje de la configuración (por defecto 20 mins)
+  const settingsResult = await pool.query('SELECT trip_auto_finish_minutes FROM settings WHERE id = 1');
+  const overlapMinutes = Math.max(1, (settingsResult.rows[0]?.trip_auto_finish_minutes || 20) - 1);
+  
   const time = new Date(scheduled_time).toISOString();
   
   let query = `
     SELECT id, driver_id, passenger_id FROM trips 
     WHERE status IN ('scheduled', 'in_progress')
-    AND scheduled_time >= $1::timestamp - interval '59 minutes'
-    AND scheduled_time <= $1::timestamp + interval '59 minutes'
+    AND scheduled_time >= $1::timestamp - interval '${overlapMinutes} minutes'
+    AND scheduled_time <= $1::timestamp + interval '${overlapMinutes} minutes'
   `;
   const params: any[] = [time];
   

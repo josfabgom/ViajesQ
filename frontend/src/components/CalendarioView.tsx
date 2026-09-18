@@ -177,6 +177,8 @@ export function CalendarioView({ trips, openModal, settings }: CalendarioViewPro
           onView={setView}
           date={date}
           onNavigate={setDate}
+          step={15}
+          timeslots={4}
           startAccessor="start"
           endAccessor="end"
           min={getMinTime()}
