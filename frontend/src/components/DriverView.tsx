@@ -24,6 +24,39 @@ const localizer = dateFnsLocalizer({
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
 
+const CustomToolbar = (toolbar: any) => {
+  const goToBack = () => toolbar.onNavigate('PREV');
+  const goToNext = () => toolbar.onNavigate('NEXT');
+  const goToCurrent = () => toolbar.onNavigate('TODAY');
+
+  return (
+    <div className="custom-calendar-toolbar">
+      <div className="toolbar-navigation">
+        <button className="toolbar-btn" onClick={goToBack}>&#10094;</button>
+        <button className="toolbar-btn today-btn" onClick={goToCurrent}>Hoy</button>
+        <button className="toolbar-btn" onClick={goToNext}>&#10095;</button>
+      </div>
+      <div className="toolbar-label">
+        <span className="rbc-toolbar-label" style={{ fontWeight: 600, fontSize: '1.1rem', textTransform: 'capitalize' }}>
+          {toolbar.label}
+        </span>
+      </div>
+      <div className="toolbar-views">
+        <select 
+          className="form-control view-select" 
+          value={toolbar.view} 
+          onChange={(e) => toolbar.onView(e.target.value)}
+        >
+          <option value="month">Mes</option>
+          <option value="week">Semana</option>
+          <option value="day">Día</option>
+          <option value="agenda">Agenda</option>
+        </select>
+      </div>
+    </div>
+  );
+};
+
 export function DriverView({ currentDriverId }: { currentDriverId?: string }) {
   const [activeTab, setActiveTab] = useState('viajes');
   
@@ -229,9 +262,9 @@ export function DriverView({ currentDriverId }: { currentDriverId?: string }) {
 
           {/* Calendar */}
           <div className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ marginTop: 0 }}>🗓️ Mi Calendario Semanal</h3>
-              <button className="btn" style={{ width: 'auto', padding: '5px 10px', fontSize: '13px' }} onClick={() => setShowMap(true)}>🗺️ Ver Mapa del Día</button>
+            <div className="calendar-header">
+              <h3 style={{ margin: 0 }}>🗓️ Mi Calendario Semanal</h3>
+              <button className="btn" style={{ width: 'auto', padding: '6px 12px', fontSize: '13px' }} onClick={() => setShowMap(true)}>🗺️ Ver Mapa del Día</button>
             </div>
             <div style={{ height: '500px' }}>
               <Calendar
@@ -246,6 +279,9 @@ export function DriverView({ currentDriverId }: { currentDriverId?: string }) {
                 min={getMinTime()}
                 max={getMaxTime()}
                 culture="es"
+                components={{
+                  toolbar: CustomToolbar
+                }}
                 messages={{ next: "Sig", previous: "Ant", today: "Hoy", month: "Mes", week: "Semana", day: "Día", noEventsInRange: "No hay viajes programados." }}
                 eventPropGetter={(event) => {
                   let backgroundColor = '#3b82f6'; // Programado
@@ -332,9 +368,9 @@ export function DriverView({ currentDriverId }: { currentDriverId?: string }) {
                   {pendingTrips.length === 0 && <tr><td colSpan={3} style={{textAlign:'center', padding:'20px'}}>No hay viajes pendientes.</td></tr>}
                   {pendingTrips.map(t => (
                     <tr key={t.id}>
-                      <td>{new Date(t.ended_at || t.scheduled_time || t.created_at).toLocaleDateString()}</td>
-                      <td>{t.origin_address} ➔ {t.destination_address}</td>
-                      <td style={{ fontWeight: 'bold' }}>${t.total_price}</td>
+                      <td data-label="Fecha">{new Date(t.ended_at || t.scheduled_time || t.created_at).toLocaleDateString()}</td>
+                      <td data-label="Ruta">{t.origin_address} ➔ {t.destination_address}</td>
+                      <td data-label="Monto" style={{ fontWeight: 'bold' }}>${t.total_price}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -353,9 +389,9 @@ export function DriverView({ currentDriverId }: { currentDriverId?: string }) {
                   {paymentHistory.length === 0 && <tr><td colSpan={3} style={{textAlign:'center', padding:'20px'}}>No hay pagos registrados.</td></tr>}
                   {paymentHistory.map(p => (
                     <tr key={p.id}>
-                      <td>{new Date(p.created_at).toLocaleDateString()}</td>
-                      <td style={{ textTransform: 'capitalize' }}>{p.payment_method}</td>
-                      <td style={{ color: '#10b981', fontWeight: 'bold' }}>+${parseFloat(p.amount).toFixed(2)}</td>
+                      <td data-label="Fecha">{new Date(p.created_at).toLocaleDateString()}</td>
+                      <td data-label="Método" style={{ textTransform: 'capitalize' }}>{p.payment_method}</td>
+                      <td data-label="Monto" style={{ color: '#10b981', fontWeight: 'bold' }}>+${parseFloat(p.amount).toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
